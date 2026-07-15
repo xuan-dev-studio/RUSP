@@ -74,5 +74,3 @@
 ![](docs/imgs/截图01.png)
 
 ![](docs/imgs/截图02.png)
-
-![](docs/imgs/截图03.png)
