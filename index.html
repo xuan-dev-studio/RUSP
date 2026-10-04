@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1100">
+<title>运营商 / 二代云 账号匹配分析</title>
+<style>
+  :root, [data-theme="light"] {
+    --bg: #f5f7fa;
+    --card: #ffffff;
+    --soft: #f1f5f9;
+    --ghost-hover: #f1f5f9;
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --muted: #64748b;
+    --ok: #16a34a;
+    --warn: #ea580c;
+    --bad: #dc2626;
+  }
+  [data-theme="dark"] {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --soft: #0f172a;
+    --ghost-hover: #334155;
+    --primary: #3b82f6;
+    --primary-hover: #2563eb;
+    --border: #334155;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --ok: #4ade80;
+    --warn: #fb923c;
+    --bad: #f87171;
+  }
+  [data-theme="dark"] .tag.ok { background: rgba(74,222,128,.15); }
+  [data-theme="dark"] .tag.bad { background: rgba(248,113,113,.15); }
+  [data-theme="dark"] .tag.warn { background: rgba(251,146,60,.15); }
+  [data-theme="dark"] .tag.info { background: rgba(59,130,246,.15); }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-width: 1100px;
+    font-family: Arial, "Microsoft YaHei", "Times New Roman", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 20px 60px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 18px 20px; margin-bottom: 18px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  label { display: block; font-weight: bold; font-size: 13px; margin-bottom: 6px; }
+  label .hint { font-weight: normal; color: var(--muted); }
+  textarea {
+    width: 100%; height: 150px; resize: none; overflow-y: auto;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--card);
+    padding: 10px 12px; font-family: Consolas, "Courier New", monospace;
+    font-size: 13px; line-height: 1.6; color: var(--text);
+  }
+  .btns { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 4px; }
+  button {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    border: none; border-radius: 8px; padding: 10px 18px;
+    font-size: 14px; font-weight: bold; cursor: pointer; font-family: inherit;
+    line-height: 1.4; box-sizing: border-box;
+    background: var(--primary); color: #fff; transition: background .15s;
+  }
+  button:hover { background: var(--primary-hover); }
+  button.ghost { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+  button.ghost:hover { background: var(--ghost-hover); }
+  .upload-btn {
+    display: inline-flex; align-items: center; gap: 6px; margin: 0; border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 18px; font-size: 14px; font-weight: bold; cursor: pointer; font-family: inherit;
+    line-height: 1.4; box-sizing: border-box; white-space: nowrap;
+    background: var(--card); color: var(--text); transition: background .15s;
+  }
+  .btn-ic { width: 16px; height: 16px; flex: 0 0 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { display: none; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; flex: 0 0 16px; }
+  .has-spinner.loading .btn-ic { display: none; }
+  .has-spinner.loading .spinner { display: inline-block; }
+  .has-spinner:disabled { opacity: .85; cursor: progress; }
+  .upload-btn:hover { background: var(--ghost-hover); }
+  .stats { display: flex; gap: 14px; flex-wrap: wrap; margin: 4px 0 14px; }
+  .search-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
+  .search-bar input {
+    flex: 1; height: 38px; padding: 0 12px; font-size: 14px; font-family: inherit;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--text);
+  }
+  .search-bar input:focus { outline: none; border-color: var(--primary); }
+  .search-bar .search-count { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .stat {
+    background: var(--soft); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 14px; font-size: 13px;
+  }
+  .stat b { font-size: 18px; display: block; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--soft); font-weight: bold; white-space: nowrap; }
+  .header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .theme-toggle {
+    display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+    width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--card); color: var(--text); cursor: pointer; transition: background .15s;
+  }
+  .theme-toggle:hover { background: var(--ghost-hover); }
+  .theme-toggle svg { width: 26px; height: 26px; flex: 0 0 26px; }
+  [data-theme="light"] .ic-sun { display: none; }
+  [data-theme="dark"] .ic-moon { display: none; }
+  .res { margin-top: 6px; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: bold; white-space: nowrap; }
+  .tag.ok { background: #dcfce7; color: var(--ok); }
+  .tag.bad { background: #fee2e2; color: var(--bad); }
+  .tag.warn { background: #ffedd5; color: var(--warn); }
+  .tag.info { background: #dbeafe; color: var(--primary); }
+  .match-list { font-family: Consolas, monospace; }
+  .match-list .mid { color: var(--muted); font-size: 11px; }
+  .note { color: var(--muted); font-size: 12px; }
+  .orphan { font-family: Consolas, monospace; font-size: 12px; color: var(--muted); }
+  .empty { color: var(--muted); font-size: 13px; padding: 16px; text-align: center; }
+  .footer { text-align: center; color: var(--muted); font-size: 12px; padding: 18px 0 0; }
+  .pager { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+  .pager-btn {
+    padding: 6px 12px; font-size: 13px; font-weight: normal; line-height: 1.4;
+    background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 8px;
+  }
+  .pager-btn:hover:not(:disabled):not(.active) { background: var(--ghost-hover); }
+  .pager-btn:disabled { opacity: .5; cursor: not-allowed; }
+  .pager-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .pager-ellipsis { color: var(--muted); padding: 0 2px; }
+  .pager-info { color: var(--muted); font-size: 12px; margin-left: 8px; white-space: nowrap; }
+</style>
+<script>
+  // 尽早设置主题，避免深色模式闪烁
+  (function(){
+    var saved = null;
+    try { saved = localStorage.getItem("theme"); } catch(e){}
+    document.documentElement.setAttribute("data-theme", saved === "dark" ? "dark" : "light");
+  })();
+</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="header-row">
+    <div>
+      <h1>运营商 / 二代云 账号匹配分析</h1>
+      <div class="sub">
+        运营商导出号中间 4 位以 <b>****</b> 隐藏（如 <code>137****1234</code>）。<br>
+        <b>① 模糊匹配</b>：当账号为 <code>123****4567</code> 这类<b>含 *</b> 的格式时，程序按「前 3 位 + 后 4 位」规则在二代云中找匹配项（中间 4 位可不同），结果准确率约 <b>80%</b>，可能存在中间 4 位不同导致的误匹配。<br>
+        <b>② 精确匹配</b>：只有当账号<b>完全提供、不含 *</b>（如 <code>19322221234</code>）时，才进行号码级精确匹配，结果与说明更为准确可靠。
+      </div>
+    </div>
+    <button class="theme-toggle" id="themeToggle" title="切换深色/亮色模式" aria-label="切换主题">
+      <svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+    </button>
+  </div>
+
+  <div class="card">
+    <div class="grid2">
+      <div>
+        <label>运营商导出用户账号 <span class="hint">（每行一个，或直接从 Excel 粘贴两列）</span></label>
+        <textarea id="opInput" placeholder="137****1234&#10;132****5678&#10;138****9999"></textarea>
+      </div>
+      <div>
+        <label>寰创二代云导出用户账号 <span class="hint">（每行一个完整号码）</span></label>
+        <textarea id="cloudInput" placeholder="13700001234&#10;13200015678&#10;13800029999"></textarea>
+      </div>
+    </div>
+    <div class="btns">
+      <button id="analyzeBtn" class="has-spinner"><svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span class="btn-label">分析结果</span><span class="spinner" aria-hidden="true"></span></button>
+      <button class="ghost" id="sampleBtn"><svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>载入示例</button>
+      <button class="ghost" id="clearBtn"><svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>清空</button>
+      <label class="upload-btn" for="fileInput"><svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>上传 Excel 文件</label>
+      <input type="file" id="fileInput" accept=".xlsx,.xls" hidden>
+      <button class="ghost" id="tplBtn"><svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>下载导入模板</button>
+      <button class="ghost" id="exportBtn"><svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>导出结果</button>
+    </div>
+  </div>
+
+  <div class="card" id="resultCard" style="display:none">
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="搜索：运营商号 / 二代云号 / 说明...">
+      <button class="ghost" id="searchClear">清除</button>
+      <span class="search-count" id="searchCount"></span>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="res">
+      <table id="resultTable">
+        <thead>
+          <tr>
+            <th>运营商导出号列</th>
+            <th>二代云号列匹配的号列</th>
+            <th>匹配结果号列</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody id="resultBody"></tbody>
+      </table>
+    </div>
+    <div id="pager" class="pager" style="display:none"></div>
+    <div id="orphanBox" style="margin-top:14px"></div>
+  </div>
+
+  <div class="footer"><a href="https://github.com/xuan-dev-studio/RUSP/releases" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none;border-bottom:1px dashed var(--muted);">VER20260722P01R03</a> &nbsp;|&nbsp; <a href="https://xuan-dev-studio.github.io/" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none;border-bottom:1px dashed var(--muted);">小小轩爱开发©2026</a></div>
+</div>
+
+<script>
+// ===== Console Banner =====
+(function() {
+    var _v = "VER20260722P01R03";
+    var _a = [
+        "                  00001     00  10      00      101     00",
+        "             1   101 000   000  000     00     0000     0001   100",
+        "         00000   00   100100    001     00    100000    00000  100  00000",
+        "     100001     001    1000     000     00    00  001   001000 100     10000",
+        "      000001    00     00000    000     00   001  100   001 100100    100000",
+        "          1000 10    100  1001   00    100  000    100  001   0000  0000",
+        "               00   000    1001  100000001 10000000 000 001    000"
+    ].join("\n");
+    console.log("%c\n" + _a + "\n", "color:#2563eb;font-family:monospace;font-size:12px;line-height:1.4;");
+    console.log("%c RUSP %c " + _v + " %c \u5c0f\u5c0f\u8f69\u7231\u5f00\u53d1\u00a92026 ",
+        "background:#2563eb;color:#fff;padding:3px 8px;border-radius:4px 0 0 4px;font-weight:700;font-size:13px;",
+        "background:#334155;color:#fff;padding:3px 8px;font-size:13px;",
+        "background:#64748b;color:#fff;padding:3px 8px;border-radius:0 4px 4px 0;font-size:13px;");
+    console.log("%cLearn Humbly, Build Boldly. \u8c26\u5b66\u52c7\u521b", "color:#2563eb;font-size:13px;font-weight:600;font-style:italic;padding:4px 0;");
+})();
+
+// ---- 主题切换 ----
+document.getElementById("themeToggle").addEventListener("click", () => {
+  const root = document.documentElement;
+  const next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+  root.setAttribute("data-theme", next);
+  try { localStorage.setItem("theme", next); } catch(e){}
+});
+
+// ---- 示例数据（取自 示例文件.xlsx）----
+const SAMPLE_OP = ["137****1234","132****5678","138****9999","138****9999"];
+const SAMPLE_CLOUD = ["13700001234","13200015678","15000012910","13800019999","13800029999"];
+
+function digitsOnly(s){ return String(s).replace(/\D/g, ""); }
+
+// 从运营商文本解析出 前3位 + 后4位 特征
+function parseOp(s){
+  s = String(s).trim();
+  const star = s.indexOf("*");
+  if (star >= 0){
+    // 含 * 的模糊号：按「前3位 + 后4位」匹配
+    const prefix = s.substring(0, star).replace(/\D/g, "");
+    const after = s.substring(s.lastIndexOf("*")+1).replace(/\D/g, "");
+    return { prefix, suffix: after, raw: s, masked: true, full: null };
+  }
+  const d = digitsOnly(s);
+  // 完整号码：需做精确匹配（保留完整数字串）
+  if (d.length >= 7) return { prefix: d.substring(0,3), suffix: d.substring(d.length-4), raw: s, masked: false, full: d };
+  return null; // 无法解析
+}
+
+function readLines(text){
+  return text.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+}
+
+function analyze(){
+  const opLines = readLines(document.getElementById("opInput").value);
+  const cloudLines = readLines(document.getElementById("cloudInput").value);
+
+  // 二代云号码列表（保留原始与纯数字），并预计算索引键 前3|后4
+  const clouds = cloudLines.map(raw => {
+    const d = digitsOnly(raw);
+    const pkey = d.length >= 7 ? d.substring(0, 3) + "|" + d.substring(d.length - 4) : null;
+    return { raw, d, pkey };
+  });
+
+  // 建立索引：pkey -> 匹配的二代云号码，将 O(运营商×二代云) 降为 O(运营商+二代云)
+  const cloudIndex = new Map();
+  clouds.forEach(c => {
+    if (!c.pkey) return;
+    if (!cloudIndex.has(c.pkey)) cloudIndex.set(c.pkey, []);
+    cloudIndex.get(c.pkey).push(c);
+  });
+
+  const results = [];
+  const matchedCloudSet = new Set(); // 记录被运营商号匹配到的二代云号
+
+  // 1) 运营商号驱动的行
+  opLines.forEach(opRaw => {
+    const p = parseOp(opRaw);
+    if (!p){ return; } // 跳过无法解析（如空行/NaN）
+    if (p.prefix.length < 3 || p.suffix.length < 4){
+      results.push({ type: "op", op: opRaw, matches: [], status: "bad", reason: "格式无法识别" });
+      return;
+    }
+    const candidates = cloudIndex.get(p.prefix + "|" + p.suffix) || [];
+    // 模糊号（含*）：前3+后4匹配；完整号：需与二代云号完全一致（精确匹配）
+    const matches = p.masked ? candidates : candidates.filter(c => c.d === p.full);
+    matches.forEach(m => matchedCloudSet.add(m));
+    const middles = matches.map(m => m.d.substring(3, m.d.length - 4));
+    const middleDiffers = new Set(middles).size > 1;
+
+    let status, reason;
+    if (matches.length === 0){
+      status = "bad";
+      // 完整号但候选里有前3+后4相同却中间不同的号码，给出更明确的说明
+      reason = (!p.masked && candidates.length > 0) ? "二代云中无精确匹配（存在前3+后4相同但中间不同的号码）" : (p.masked ? "二代云中无匹配" : "二代云中无精确匹配");
+    } else if (matches.length === 1){
+      status = "ok"; reason = p.masked ? "唯一匹配" : "精确匹配";
+    } else {
+      status = "warn";
+      reason = middleDiffers ? ("多重匹配，中间4位不同(" + middles.join("/") + ")") : "多重匹配(中间4位相同)";
+    }
+    results.push({ type: "op", op: opRaw, matches, status, reason, middles, middleDiffers });
+  });
+
+  // 2) 仅存在于二代云、运营商无匹配的行
+  const validCloud = clouds.filter(c => c.pkey).length;
+  clouds.forEach(c => {
+    if (!c.pkey) return;
+    if (!matchedCloudSet.has(c)){
+      results.push({ type: "cloud", op: "—", cloud: c, status: "info", reason: "仅存在于二代云（运营商中无匹配）" });
+    }
+  });
+
+  lastResults = results;
+  lastValidCloud = validCloud || 0;
+  render();
+}
+
+let lastResults = null;
+let lastValidCloud = 0;
+let searchTerm = "";
+const PAGE_SIZE = 50;
+let currentPage = 1;
+function exportExcel(){
+  if (!lastResults || !lastResults.length){
+    alert("请先点击「分析结果」生成数据后再导出。");
+    return;
+  }
+  const rows = [["运营商导出号", "二代云匹配号", "匹配结果", "说明"]];
+  lastResults.forEach(r => {
+    let op, matchStr, label;
+    if (r.type === "cloud"){
+      op = "—";
+      matchStr = r.cloud.raw;
+      label = "仅二代云";
+    } else {
+      op = r.op;
+      matchStr = r.matches.length ? r.matches.map(m => m.raw).join(", ") : "";
+      label = r.status === "ok" ? "匹配" : (r.status === "warn" ? "匹配(多重)" : "未匹配");
+    }
+    rows.push([op, matchStr, label, r.reason || ""]);
+  });
+
+  if (typeof XLSX !== "undefined"){
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [{ wch: 16 }, { wch: 30 }, { wch: 14 }, { wch: 30 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "匹配结果");
+    XLSX.writeFile(wb, "匹配结果.xlsx");
+  } else {
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "匹配结果.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+}
+
+// 判断某行是否匹配搜索关键词（运营商号 / 二代云号 / 说明）
+function rowMatches(r, term){
+  const hay = [String(r.op), String(r.reason || "")];
+  if (r.type === "cloud"){
+    hay.push(String(r.cloud.raw));
+  } else {
+    (r.matches || []).forEach(m => hay.push(String(m.raw)));
+  }
+  return hay.join("\n").toLowerCase().indexOf(term) !== -1;
+}
+
+function applySearch(){
+  searchTerm = document.getElementById("searchInput").value || "";
+  render();
+}
+
+// keepPage=true 时保留当前页码（用于翻页）；否则回到第 1 页（用于新分析/新搜索）
+function render(keepPage){
+  const card = document.getElementById("resultCard");
+  card.style.display = "block";
+
+  const all = lastResults || [];
+
+  // 统计（基于全量分析结果，不受搜索影响）
+  const opRows = all.filter(r => r.type === "op");
+  const cloudRows = all.filter(r => r.type === "cloud");
+  const ok = opRows.filter(r => r.status === "ok").length;
+  const warn = opRows.filter(r => r.status === "warn").length;
+  const bad = opRows.filter(r => r.status === "bad").length;
+  const matchedCloud = (lastValidCloud || 0) - cloudRows.length;
+
+  // 搜索过滤
+  const term = searchTerm.trim().toLowerCase();
+  const display = term ? all.filter(r => rowMatches(r, term)) : all;
+
+  document.getElementById("stats").innerHTML =
+    `<div class="stat"><b>${opRows.length}</b>运营商号</div>` +
+    `<div class="stat"><b style="color:var(--ok)">${ok}</b>唯一匹配</div>` +
+    `<div class="stat"><b style="color:var(--warn)">${warn}</b>多重匹配</div>` +
+    `<div class="stat"><b style="color:var(--bad)">${bad}</b>运营商未匹配</div>` +
+    `<div class="stat"><b>${lastValidCloud || 0}</b>二代云总数</div>` +
+    `<div class="stat"><b style="color:var(--ok)">${matchedCloud}</b>二代云已匹配</div>` +
+    `<div class="stat"><b style="color:var(--primary)">${cloudRows.length}</b>仅二代云</div>`;
+
+  const searchCount = document.getElementById("searchCount");
+  searchCount.textContent = term ? `搜索「${searchTerm.trim()}」：${display.length} / ${all.length} 条` : "";
+
+  const body = document.getElementById("resultBody");
+  body.innerHTML = "";
+  if (all.length === 0){
+    body.innerHTML = `<tr><td colspan="4" class="empty">暂无数据，请先输入运营商与二代云账号</td></tr>`;
+    document.getElementById("orphanBox").innerHTML = "";
+    document.getElementById("pager").style.display = "none";
+    return;
+  }
+  if (display.length === 0){
+    body.innerHTML = `<tr><td colspan="4" class="empty">未找到与「${searchTerm.trim()}」匹配的结果</td></tr>`;
+    document.getElementById("orphanBox").innerHTML = "";
+    document.getElementById("pager").style.display = "none";
+    return;
+  }
+
+  // 分页：仅渲染当前页的数据
+  const total = display.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (!keepPage) currentPage = 1;
+  if (currentPage > totalPages) currentPage = totalPages;
+  if (currentPage < 1) currentPage = 1;
+  const pageRows = display.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  pageRows.forEach(r => {
+    const tr = document.createElement("tr");
+    // 运营商号
+    const tdOp = document.createElement("td");
+    tdOp.textContent = r.op;
+    // 二代云匹配号
+    const tdMatch = document.createElement("td");
+    tdMatch.className = "match-list";
+    if (r.type === "cloud"){
+      tdMatch.innerHTML = `${r.cloud.raw} <span class="mid">[中:${r.cloud.d.substring(3, r.cloud.d.length - 4)}]</span>`;
+    } else if (r.matches.length === 0){
+      tdMatch.innerHTML = `<span class="note">— 无 —</span>`;
+    } else {
+      tdMatch.innerHTML = r.matches.map((m,i) =>
+        `${m.raw} <span class="mid">[中:${r.middles[i]}]</span>`
+      ).join("<br>");
+    }
+    // 匹配结果
+    const tdRes = document.createElement("td");
+    let cls = r.status === "ok" ? "ok" : (r.status === "warn" ? "warn" : (r.status === "info" ? "info" : "bad"));
+    let label = r.status === "ok" ? "匹配" : (r.status === "warn" ? "匹配(多重)" : (r.status === "info" ? "仅二代云" : "未匹配"));
+    tdRes.innerHTML = `<span class="tag ${cls}">${label}</span>`;
+    // 说明
+    const tdNote = document.createElement("td");
+    tdNote.className = "note";
+    tdNote.textContent = r.reason || "";
+    tr.append(tdOp, tdMatch, tdRes, tdNote);
+    body.appendChild(tr);
+  });
+
+  document.getElementById("orphanBox").innerHTML = "";
+  renderPager(total, totalPages);
+}
+
+function renderPager(total, totalPages){
+  const pager = document.getElementById("pager");
+  if (totalPages <= 1){
+    pager.style.display = "none";
+    return;
+  }
+  pager.style.display = "flex";
+
+  let html = `<button class="pager-btn" data-page="${currentPage - 1}" ${currentPage === 1 ? "disabled" : ""}>上一页</button>`;
+
+  const nums = [];
+  const win = 2;
+  for (let p = 1; p <= totalPages; p++){
+    if (p === 1 || p === totalPages || (p >= currentPage - win && p <= currentPage + win)) nums.push(p);
+  }
+  let prev = 0;
+  nums.forEach(p => {
+    if (p - prev > 1) html += `<span class="pager-ellipsis">…</span>`;
+    html += `<button class="pager-btn ${p === currentPage ? "active" : ""}" data-page="${p}">${p}</button>`;
+    prev = p;
+  });
+
+  html += `<button class="pager-btn" data-page="${currentPage + 1}" ${currentPage === totalPages ? "disabled" : ""}>下一页</button>`;
+  html += `<span class="pager-info">第 ${currentPage}/${totalPages} 页 · 共 ${total} 条（每页 ${PAGE_SIZE} 条）</span>`;
+  pager.innerHTML = html;
+}
+
+// ---- 事件 ----
+document.getElementById("analyzeBtn").addEventListener("click", () => {
+  const btn = document.getElementById("analyzeBtn");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  btn.classList.add("loading");
+  btn.querySelector(".btn-label").textContent = "分析中...";
+  // 延迟一帧再执行，确保“分析中”状态先绘制，避免大批量时误以为没点上
+  setTimeout(() => {
+    try { analyze(); } finally {
+      btn.disabled = false;
+      btn.classList.remove("loading");
+      btn.querySelector(".btn-label").textContent = "分析结果";
+    }
+  }, 30);
+});
+document.getElementById("exportBtn").addEventListener("click", exportExcel);
+document.getElementById("pager").addEventListener("click", e => {
+  const btn = e.target.closest("button[data-page]");
+  if (!btn || btn.disabled) return;
+  const p = parseInt(btn.dataset.page, 10);
+  if (isNaN(p)) return;
+  currentPage = p;
+  if (lastResults) render(true);
+});
+document.getElementById("sampleBtn").addEventListener("click", () => {
+  document.getElementById("opInput").value = SAMPLE_OP.join("\n");
+  document.getElementById("cloudInput").value = SAMPLE_CLOUD.join("\n");
+});
+document.getElementById("clearBtn").addEventListener("click", () => {
+  document.getElementById("opInput").value = "";
+  document.getElementById("cloudInput").value = "";
+  document.getElementById("searchInput").value = "";
+  document.getElementById("searchCount").textContent = "";
+  document.getElementById("resultCard").style.display = "none";
+  lastResults = null;
+  lastValidCloud = 0;
+  searchTerm = "";
+  currentPage = 1;
+});
+document.getElementById("searchInput").addEventListener("input", applySearch);
+document.getElementById("searchClear").addEventListener("click", () => {
+  document.getElementById("searchInput").value = "";
+  applySearch();
+});
+document.getElementById("tplBtn").addEventListener("click", () => {
+  const a = document.createElement("a");
+  a.href = "模板文件.xlsx";
+  a.download = "模板文件.xlsx";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+});
+
+// 单列粘贴：若某行包含 tab，则拆成两列
+document.getElementById("opInput").addEventListener("paste", e => {
+  setTimeout(() => splitPaste("opInput", "cloudInput"), 0);
+});
+function splitPaste(opId, cloudId){
+  const op = document.getElementById(opId);
+  const cloud = document.getElementById(cloudId);
+  const lines = op.value.split(/\r?\n/);
+  if (!lines.some(l => l.includes("\t"))) return;
+  const ops = [], cl = [];
+  lines.forEach(l => {
+    const parts = l.split("\t");
+    ops.push(parts[0] || "");
+    if (parts[1] !== undefined) cl.push(parts[1]);
+  });
+  op.value = ops.join("\n");
+  cloud.value = cl.join("\n");
+}
+
+// ---- xlsx 上传（优先用 SheetJS CDN，失败则提示粘贴）----
+document.getElementById("fileInput").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      if (typeof XLSX === "undefined"){
+        throw new Error("SheetJS 未加载，请改用粘贴方式输入数据。");
+      }
+      const wb = XLSX.read(ev.target.result, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+      const OP_HEADER = "运营商导出用户账号";
+      const CLOUD_HEADER = "寰创二代云导出用户账号";
+      const ops = [], cl = [];
+      rows.forEach(r => {
+        const a = r[0] !== undefined ? String(r[0]).trim() : "";
+        const b = r[1] !== undefined ? String(r[1]).trim() : "";
+        if (a && a !== OP_HEADER) ops.push(a);
+        if (b && b !== CLOUD_HEADER) cl.push(b);
+      });
+      document.getElementById("opInput").value = ops.join("\n");
+      document.getElementById("cloudInput").value = cl.join("\n");
+    } catch(err){
+      alert("读取失败：" + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+</script>
+<script src="xlsx.full.min.js"></script>
+</body>
+</html>
